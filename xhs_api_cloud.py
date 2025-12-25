@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import sys
 import os
+import json  # ✅ 添加缺失的 json 导入
 import logging
 from pathlib import Path
 
