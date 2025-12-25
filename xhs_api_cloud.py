@@ -154,56 +154,49 @@ async def search_posts(request: SearchRequest) -> List[PostData]:
         # 转换为统一格式
         posts = []
         for item in result[:request.max_posts]:
-            # 提取笔记信息 - 支持多种API返回格式
+            # 🔍 DEBUG: 记录每个item的结构（帮助诊断）
+            if len(posts) == 0:  # 只记录第一条
+                logger.info(f"处理第一个item，keys: {list(item.keys())}")
+
+            # 提取笔记信息 - 正确的嵌套路径：item.note_card.display_title
             note_id = item.get('id', item.get('note_id', ''))
 
-            # 智能提取标题 - 按优先级尝试多个路径
+            # ✅ 修复：优先使用 note_card 下的字段（正确路径）
             title = (
-                item.get('display_title') or
+                item.get('note_card', {}).get('display_title') or  # 主要路径
+                item.get('note_card', {}).get('title') or
+                item.get('display_title') or  # 备用路径（如果数据结构变化）
                 item.get('title') or
-                item.get('model', {}).get('note_card', {}).get('display_title') or
-                item.get('model', {}).get('note_card', {}).get('title') or
-                item.get('model', {}).get('display_title') or
-                item.get('model', {}).get('title') or
                 '无标题'
             )
 
-            # 智能提取内容
+            # ✅ 修复：从 note_card 提取描述
             content = (
+                item.get('note_card', {}).get('desc') or
                 item.get('desc') or
-                item.get('model', {}).get('note_card', {}).get('desc') or
-                item.get('model', {}).get('desc') or
                 ''
             )
 
-            # 智能提取作者
+            # ✅ 修复：从 note_card.user 提取作者昵称
             author = '未知用户'
-            for user_path in [
-                item.get('user'),
-                item.get('model', {}).get('note_card', {}).get('user'),
-                item.get('model', {}).get('user')
-            ]:
-                if isinstance(user_path, dict) and user_path.get('nickname'):
-                    author = user_path.get('nickname')
-                    break
+            user_data = item.get('note_card', {}).get('user')
+            if isinstance(user_data, dict) and user_data.get('nickname'):
+                author = user_data.get('nickname')
+            elif isinstance(item.get('user'), dict) and item.get('user', {}).get('nickname'):
+                author = item.get('user', {}).get('nickname')
 
-            # 智能提取点赞数
+            # ✅ 修复：从 note_card.interact_info 提取点赞数
             likes = 0
-            for interact_path in [
-                item.get('interact_info'),
-                item.get('model', {}).get('note_card', {}).get('interact_info'),
-                item.get('model', {}).get('interact_info')
-            ]:
-                if isinstance(interact_path, dict):
-                    likes = interact_path.get('liked_count', 0)
-                    if likes > 0:
-                        break
+            interact_info = item.get('note_card', {}).get('interact_info')
+            if isinstance(interact_info, dict):
+                likes = interact_info.get('liked_count', 0)
+            if likes == 0 and isinstance(item.get('interact_info'), dict):
+                likes = item.get('interact_info', {}).get('liked_count', 0)
 
-            # 智能提取时间
+            # ✅ 修复：从 note_card 提取时间
             created_at = (
+                item.get('note_card', {}).get('time') or
                 item.get('time') or
-                item.get('model', {}).get('note_card', {}).get('time') or
-                item.get('model', {}).get('time') or
                 ''
             )
 
@@ -249,12 +242,12 @@ async def test_connection():
         if success and result:
             first_post = result[0] if result else None
             if first_post:
-                # 智能提取标题（支持多种格式）
+                # ✅ 修复：使用正确的 note_card 路径提取标题
                 title = (
+                    first_post.get('note_card', {}).get('display_title') or
+                    first_post.get('note_card', {}).get('title') or
                     first_post.get('display_title') or
                     first_post.get('title') or
-                    first_post.get('model', {}).get('note_card', {}).get('display_title') or
-                    first_post.get('model', {}).get('display_title') or
                     '测试笔记'
                 )
                 return {
