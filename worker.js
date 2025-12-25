@@ -2089,13 +2089,13 @@ function getDashboardHTML() {
                 loadStats();
                 loadNegativePosts();
                 loadLogs();
-            }, CONFIG.REFRESH_INTERVAL);
+            }, 30000); // 30 seconds
         });
 
         // 加载配置
         async function loadConfig() {
             try {
-                const response = await fetch(\`\${WORKER_URL}/config\`);
+                const response = await fetch(WORKER_URL + '/config');
                 const data = await response.json();
 
                 if (data.success) {
@@ -2121,7 +2121,7 @@ function getDashboardHTML() {
         // 加载 Cookie 状态
         async function loadCookieStatus() {
             try {
-                const response = await fetch(\`\${WORKER_URL}/cookie-status\`);
+                const response = await fetch(WORKER_URL + '/cookie-status');
                 const data = await response.json();
 
                 if (data.success) {
@@ -2174,7 +2174,7 @@ function getDashboardHTML() {
             }
 
             try {
-                const response = await fetch(\`\${WORKER_URL}/config\`, {
+                const response = await fetch(WORKER_URL + '/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(configData)
@@ -2196,7 +2196,7 @@ function getDashboardHTML() {
         // 加载统计数据
         async function loadStats() {
             try {
-                const response = await fetch(\`\${WORKER_URL}/stats\`);
+                const response = await fetch(WORKER_URL + '/stats');
                 const data = await response.json();
 
                 if (data.success) {
@@ -2227,7 +2227,7 @@ function getDashboardHTML() {
         // 加载消极帖子
         async function loadNegativePosts() {
             try {
-                const response = await fetch(\`\${WORKER_URL}/negative-posts?limit=10\`);
+                const response = await fetch(WORKER_URL + '/negative-posts?limit=10');
                 const data = await response.json();
 
                 if (data.success) {
@@ -2251,7 +2251,7 @@ function getDashboardHTML() {
         // 加载关键词统计
         async function loadKeywordStats() {
             try {
-                const response = await fetch(\`\${WORKER_URL}/keyword-stats\`);
+                const response = await fetch(WORKER_URL + '/keyword-stats');
                 const data = await response.json();
 
                 if (data.success) {
@@ -2281,7 +2281,7 @@ function getDashboardHTML() {
         // 加载日志
         async function loadLogs() {
             try {
-                const response = await fetch(\`\${WORKER_URL}/logs?limit=10\`);
+                const response = await fetch(WORKER_URL + '/logs?limit=10');
                 const data = await response.json();
 
                 if (data.success) {
@@ -2305,7 +2305,7 @@ function getDashboardHTML() {
             statusDiv.innerHTML = '<div class="loading"><div class="spinner"></div>采集中...</div>';
 
             try {
-                const response = await fetch(\`\${WORKER_URL}/collect\`, {
+                const response = await fetch(WORKER_URL + '/collect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({})
