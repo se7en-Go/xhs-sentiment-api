@@ -1027,7 +1027,51 @@ async function scrapeXHSData(keyword, maxPosts, env) {
 }
 
 /**
- * 采集和分析数据
+ * 生成随机延迟时间（模拟人类行为）
+ * @param {number} minSeconds - 最小秒数
+ * @param {number} maxSeconds - 最大秒数
+ * @returns {number} 延迟毫秒数
+ */
+function getRandomDelay(minSeconds = 10, maxSeconds = 25) {
+  const minMs = minSeconds * 1000;
+  const maxMs = maxSeconds * 1000;
+  return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+}
+
+/**
+ * 串行采集单个关键词（带延迟）
+ * @param {string} keyword - 关键词
+ * @param {number} maxPosts - 最大帖子数
+ * @param {object} env - 环境变量
+ * @param {number} index - 当前索引（用于计算延迟）
+ * @param {number} total - 总数（用于日志）
+ */
+async function scrapeKeywordWithDelay(keyword, maxPosts, env, index, total) {
+  log('info', `开始采集关键词 [${index + 1}/${total}]: ${keyword}`);
+
+  // 如果不是第一个关键词，添加延迟
+  if (index > 0) {
+    const delay = getRandomDelay(10, 25); // 10-25秒随机延迟
+    log('info', `等待 ${Math.round(delay / 1000)} 秒后采集下一个关键词...`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+
+  const posts = await scrapeXHSData(keyword, maxPosts, env);
+
+  // 如果采集到多个帖子，在帖子之间也添加小延迟（模拟人类阅读）
+  if (posts.length > 1) {
+    log('info', `为 ${posts.length} 个帖子添加渐进式延迟...`);
+
+    // 模拟帖子处理延迟（每个帖子2-5秒）
+    const perPostDelay = getRandomDelay(2, 5);
+    await new Promise(resolve => setTimeout(resolve, perPostDelay));
+  }
+
+  return posts;
+}
+
+/**
+ * 采集和分析数据（串行模式 + 智能延迟）
  */
 async function collectAndAnalyze(env, keywords = null) {
   try {
@@ -1045,22 +1089,32 @@ async function collectAndAnalyze(env, keywords = null) {
     const maxPostsStr = await env.CONFIG_KV.get('config:maxPosts');
     const maxPosts = maxPostsStr ? parseInt(maxPostsStr) : CONFIG.MAX_POSTS_PER_KEYWORD;
 
-    log('info', 'Starting data collection', { keywords, maxPosts });
+    // 获取延迟配置（可选）
+    const delayConfigStr = await env.CONFIG_KV.get('config:scrapeDelay');
+    const delayConfig = delayConfigStr ? JSON.parse(delayConfigStr) : { enabled: true };
+
+    log('info', 'Starting data collection (串行模式 + 智能延迟)', {
+      keywords,
+      maxPosts,
+      delayConfig
+    });
 
     const allPosts = [];
 
-    // 并行采集所有关键词的数据
-    const scrapePromises = keywords.map(keyword =>
-      scrapeXHSData(keyword, maxPosts, env)
-    );
+    // ✅ 改为串行采集（而不是并行），每个关键词之间有延迟
+    log('warn', `⏱️ 串行采集模式：${keywords.length} 个关键词，预计耗时 ${keywords.length * 15}-${keywords.length * 30} 秒`);
 
-    const results = await Promise.allSettled(scrapePromises);
+    for (let i = 0; i < keywords.length; i++) {
+      const keyword = keywords[i];
 
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        allPosts.push(...result.value);
-      } else {
-        log('error', 'Failed to scrape keyword', { error: result.reason });
+      try {
+        const posts = await scrapeKeywordWithDelay(keyword, maxPosts, env, i, keywords.length);
+        allPosts.push(...posts);
+
+        log('info', `✅ 关键词 "${keyword}" 采集完成，获取 ${posts.length} 条数据`);
+      } catch (error) {
+        log('error', `❌ 关键词 "${keyword}" 采集失败`, { error: error.message });
+        // 继续采集下一个关键词，不中断整个流程
       }
     }
 
