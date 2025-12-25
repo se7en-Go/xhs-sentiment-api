@@ -121,55 +121,66 @@ async def search_posts(request: SearchRequest) -> List[PostData]:
     try:
         logger.info(f"开始采集: 关键词={request.keyword}, 数量={request.max_posts}")
 
-        # 初始化客户端
-        xhs_client = XHS_Apis()
+        # 切换到 Spider_XHS 目录以确保 JavaScript 文件路径正确
+        import os
+        original_dir = os.getcwd()
+        spider_xhs_path = os.path.join(os.path.dirname(__file__), 'Spider_XHS')
+        os.chdir(spider_xhs_path)
+        logger.info(f"切换工作目录到: {spider_xhs_path}")
 
-        # 转换排序类型
-        sort_type_map = {
-            "general": 0,           # 综合排序
-            "time_descending": 1,   # 时间倒序
-            "popularity_descending": 2  # 热度倒序
-        }
-        sort_type_choice = sort_type_map.get(request.sort_type, 0)
+        try:
+            # 初始化客户端
+            xhs_client = XHS_Apis()
 
-        # 调用Spider_XHS搜索功能
-        success, msg, result = xhs_client.search_some_note(
-            query=request.keyword,
-            require_num=request.max_posts,
-            cookies_str=cookie,
-            sort_type_choice=sort_type_choice
-        )
+            # 转换排序类型
+            sort_type_map = {
+                "general": 0,           # 综合排序
+                "time_descending": 1,   # 时间倒序
+                "popularity_descending": 2  # 热度倒序
+            }
+            sort_type_choice = sort_type_map.get(request.sort_type, 0)
 
-        if not success:
-            raise HTTPException(status_code=500, detail=f"搜索失败: {msg}")
-
-        if not result or not isinstance(result, list):
-            raise HTTPException(status_code=404, detail="未搜索到相关笔记")
-
-        # 转换为统一格式
-        posts = []
-        for item in result[:request.max_posts]:
-            # 提取笔记信息
-            note_id = item.get('id', item.get('note_id', ''))
-            model = item.get('model', {})
-            note_card = model.get('note_card', {})
-
-            post = PostData(
-                post_id=note_id,
-                title=note_card.get('display_title', '无标题'),
-                content=note_card.get('desc', ''),
-                author=note_card.get('user', {}).get('nickname', '未知用户'),
-                url=f"https://www.xiaohongshu.com/explore/{note_id}",
-                keyword=request.keyword,
-                sentiment_score=0.5,  # 情感分析在Worker中完成
-                sentiment_label="neutral",
-                likes=note_card.get('interact_info', {}).get('liked_count', 0),
-                created_at=note_card.get('time', '')
+            # 调用Spider_XHS搜索功能
+            success, msg, result = xhs_client.search_some_note(
+                query=request.keyword,
+                require_num=request.max_posts,
+                cookies_str=cookie,
+                sort_type_choice=sort_type_choice
             )
-            posts.append(post)
 
-        logger.info(f"采集成功! 共获取 {len(posts)} 条笔记")
-        return posts
+            if not success:
+                raise HTTPException(status_code=500, detail=f"搜索失败: {msg}")
+
+            if not result or not isinstance(result, list):
+                raise HTTPException(status_code=404, detail="未搜索到相关笔记")
+
+            # 转换为统一格式
+            posts = []
+            for item in result[:request.max_posts]:
+                # 提取笔记信息
+                note_id = item.get('id', item.get('note_id', ''))
+                model = item.get('model', {})
+                note_card = model.get('note_card', {})
+
+                post = PostData(
+                    post_id=note_id,
+                    title=note_card.get('display_title', '无标题'),
+                    content=note_card.get('desc', ''),
+                    author=note_card.get('user', {}).get('nickname', '未知用户'),
+                    url=f"https://www.xiaohongshu.com/explore/{note_id}",
+                    keyword=request.keyword,
+                    sentiment_score=0.5,  # 情感分析在Worker中完成
+                    sentiment_label="neutral",
+                    likes=note_card.get('interact_info', {}).get('liked_count', 0),
+                    created_at=note_card.get('time', '')
+                )
+                posts.append(post)
+
+            logger.info(f"采集成功! 共获取 {len(posts)} 条笔记")
+            return posts
+        finally:
+            # 恢复原始工作目录
+            os.chdir(original_dir)
 
     except HTTPException:
         raise
