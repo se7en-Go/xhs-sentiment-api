@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: xhs-sentiment-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn xhs_api_cloud:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: XHS_COOKIE
+        generateValue: false  # 在Render Dashboard手动设置
+    healthCheckPath: /health
