@@ -146,25 +146,77 @@ async def search_posts(request: SearchRequest) -> List[PostData]:
         if not result or not isinstance(result, list):
             raise HTTPException(status_code=404, detail="未搜索到相关笔记")
 
+        # 🔍 DEBUG: 记录原始数据结构
+        if result and len(result) > 0:
+            logger.info(f"原始数据结构示例: {json.dumps(result[0], ensure_ascii=False)[:500]}")
+
         # 转换为统一格式
         posts = []
         for item in result[:request.max_posts]:
-            # 提取笔记信息
+            # 提取笔记信息 - 支持多种API返回格式
             note_id = item.get('id', item.get('note_id', ''))
-            model = item.get('model', {})
-            note_card = model.get('note_card', {})
+
+            # 智能提取标题 - 按优先级尝试多个路径
+            title = (
+                item.get('display_title') or
+                item.get('title') or
+                item.get('model', {}).get('note_card', {}).get('display_title') or
+                item.get('model', {}).get('note_card', {}).get('title') or
+                item.get('model', {}).get('display_title') or
+                item.get('model', {}).get('title') or
+                '无标题'
+            )
+
+            # 智能提取内容
+            content = (
+                item.get('desc') or
+                item.get('model', {}).get('note_card', {}).get('desc') or
+                item.get('model', {}).get('desc') or
+                ''
+            )
+
+            # 智能提取作者
+            author = '未知用户'
+            for user_path in [
+                item.get('user'),
+                item.get('model', {}).get('note_card', {}).get('user'),
+                item.get('model', {}).get('user')
+            ]:
+                if isinstance(user_path, dict) and user_path.get('nickname'):
+                    author = user_path.get('nickname')
+                    break
+
+            # 智能提取点赞数
+            likes = 0
+            for interact_path in [
+                item.get('interact_info'),
+                item.get('model', {}).get('note_card', {}).get('interact_info'),
+                item.get('model', {}).get('interact_info')
+            ]:
+                if isinstance(interact_path, dict):
+                    likes = interact_path.get('liked_count', 0)
+                    if likes > 0:
+                        break
+
+            # 智能提取时间
+            created_at = (
+                item.get('time') or
+                item.get('model', {}).get('note_card', {}).get('time') or
+                item.get('model', {}).get('time') or
+                ''
+            )
 
             post = PostData(
                 post_id=note_id,
-                title=note_card.get('display_title', '无标题'),
-                content=note_card.get('desc', ''),
-                author=note_card.get('user', {}).get('nickname', '未知用户'),
+                title=title,
+                content=content,
+                author=author,
                 url=f"https://www.xiaohongshu.com/explore/{note_id}",
                 keyword=request.keyword,
                 sentiment_score=0.5,  # 情感分析在Worker中完成
                 sentiment_label="neutral",
-                likes=note_card.get('interact_info', {}).get('liked_count', 0),
-                created_at=note_card.get('time', '')
+                likes=likes,
+                created_at=created_at
             )
             posts.append(post)
 
@@ -195,14 +247,25 @@ async def test_connection():
 
         if success and result:
             first_post = result[0] if result else None
-            return {
-                "success": True,
-                "message": "小红书API连接正常",
-                "test_post": {
-                    "title": first_post.get('model', {}).get('note_card', {}).get('display_title', '测试笔记') if first_post else '无',
-                    "id": first_post.get('id', 'unknown') if first_post else 'unknown'
+            if first_post:
+                # 智能提取标题（支持多种格式）
+                title = (
+                    first_post.get('display_title') or
+                    first_post.get('title') or
+                    first_post.get('model', {}).get('note_card', {}).get('display_title') or
+                    first_post.get('model', {}).get('display_title') or
+                    '测试笔记'
+                )
+                return {
+                    "success": True,
+                    "message": "小红书API连接正常",
+                    "test_post": {
+                        "title": title,
+                        "id": first_post.get('id', 'unknown')
+                    }
                 }
-            }
+            else:
+                return {"success": False, "message": "无测试数据"}
         else:
             return {"success": False, "message": f"连接测试失败: {msg}"}
     except Exception as e:
