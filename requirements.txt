@@ -2,6 +2,8 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
 requests==2.31.0
-execjs==1.5.1
 PyExecJS==1.5.1
 loguru==0.7.2
+python-dotenv
+retry
+openpyxl
