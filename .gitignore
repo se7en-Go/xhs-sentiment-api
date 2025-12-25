@@ -26,7 +26,6 @@ wheels/
 # Spider_XHS dependencies
 Spider_XHS/node_modules/
 Spider_XHS/__pycache__/
-Spider_XHS/static/
 
 # Environment variables
 .env
