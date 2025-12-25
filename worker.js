@@ -2207,15 +2207,15 @@ function getDashboardHTML() {
                     document.getElementById('negative-posts').textContent = stats.negative;
 
                     // 更新最新帖子表格
-                    const postsHtml = stats.recent_posts.slice(0, 10).map(post => \`
-                        <tr>
-                            <td>\${post.title}</td>
-                            <td>\${post.keyword}</td>
-                            <td class="sentiment-\${getSentimentClass(post.sentiment_score)}">\${post.sentiment_label}</td>
-                            <td>\${(post.sentiment_score * 100).toFixed(1)}%</td>
-                            <td>\${post.likes}</td>
-                        </tr>
-                    \`).join('');
+                    const postsHtml = stats.recent_posts.slice(0, 10).map(post =>
+                        '<tr>' +
+                            '<td>' + post.title + '</td>' +
+                            '<td>' + post.keyword + '</td>' +
+                            '<td class="sentiment-' + getSentimentClass(post.sentiment_score) + '">' + post.sentiment_label + '</td>' +
+                            '<td>' + (post.sentiment_score * 100).toFixed(1) + '%</td>' +
+                            '<td>' + post.likes + '</td>' +
+                        '</tr>'
+                    ).join('');
 
                     document.getElementById('posts-table').innerHTML = postsHtml || '<tr><td colspan="5" style="text-align:center;color:#999;">暂无数据</td></tr>';
                 }
@@ -2231,15 +2231,15 @@ function getDashboardHTML() {
                 const data = await response.json();
 
                 if (data.success) {
-                    const postsHtml = data.data.map(post => \`
-                        <tr>
-                            <td>\${post.title}</td>
-                            <td>\${post.keyword}</td>
-                            <td style="color:#ef4444;font-weight:bold;">\${(post.sentiment_score * 100).toFixed(1)}%</td>
-                            <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;">\${post.content || '-'}</td>
-                            <td>\${formatDateTime(post.created_at)}</td>
-                        </tr>
-                    \`).join('');
+                    const postsHtml = data.data.map(post =>
+                        '<tr>' +
+                            '<td>' + post.title + '</td>' +
+                            '<td>' + post.keyword + '</td>' +
+                            '<td style="color:#ef4444;font-weight:bold;">' + (post.sentiment_score * 100).toFixed(1) + '%</td>' +
+                            '<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;">' + (post.content || '-') + '</td>' +
+                            '<td>' + formatDateTime(post.created_at) + '</td>' +
+                        '</tr>'
+                    ).join('');
 
                     document.getElementById('negative-posts-table').innerHTML = postsHtml || '<tr><td colspan="5" style="text-align:center;color:#999;">暂无消极帖子</td></tr>';
                 }
@@ -2255,21 +2255,21 @@ function getDashboardHTML() {
                 const data = await response.json();
 
                 if (data.success) {
-                    const statsHtml = data.data.map(stat => \`
-                        <table class="keyword-stats-table">
-                            <tr>
-                                <td><strong>\${stat.keyword}</strong></td>
-                                <td>\${stat.total_posts} 帖</td>
-                                <td style="color:#10b981;">积极 \${stat.positive_count}</td>
-                                <td style="color:#ef4444;">消极 \${stat.negative_count}</td>
-                            </tr>
-                            <tr>
-                                <td colspan="4">
-                                    <small>平均分: \${(stat.avg_score * 100).toFixed(1)}% | 最后更新: \${formatDateTime(stat.last_post_date)}</small>
-                                </td>
-                            </tr>
-                        </table>
-                    \`).join('');
+                    const statsHtml = data.data.map(stat =>
+                        '<table class="keyword-stats-table">' +
+                            '<tr>' +
+                                '<td><strong>' + stat.keyword + '</strong></td>' +
+                                '<td>' + stat.total_posts + ' 帖</td>' +
+                                '<td style="color:#10b981;">积极 ' + stat.positive_count + '</td>' +
+                                '<td style="color:#ef4444;">消极 ' + stat.negative_count + '</td>' +
+                            '</tr>' +
+                            '<tr>' +
+                                '<td colspan="4">' +
+                                    '<small>平均分: ' + (stat.avg_score * 100).toFixed(1) + '% | 最后更新: ' + formatDateTime(stat.last_post_date) + '</small>' +
+                                '</td>' +
+                            '</tr>' +
+                        '</table>'
+                    ).join('');
 
                     document.getElementById('keyword-stats').innerHTML = statsHtml || '<div style="text-align:center;color:#999;">暂无统计数据</div>';
                 }
@@ -2285,12 +2285,12 @@ function getDashboardHTML() {
                 const data = await response.json();
 
                 if (data.success) {
-                    const logsHtml = data.data.map(log => \`
-                        <div class="log-entry log-\${log.level}">
-                            <strong>[\${log.level.toUpperCase()}]</strong> \${log.message}
-                            <br><small>\${formatDateTime(log.created_at)}</small>
-                        </div>
-                    \`).join('');
+                    const logsHtml = data.data.map(log =>
+                        '<div class="log-entry log-' + log.level + '">' +
+                            '<strong>[' + log.level.toUpperCase() + ']</strong> ' + log.message +
+                            '<br><small>' + formatDateTime(log.created_at) + '</small>' +
+                        '</div>'
+                    ).join('');
 
                     document.getElementById('logs').innerHTML = logsHtml || '<div style="text-align:center;color:#999;">暂无日志</div>';
                 }
@@ -2314,15 +2314,15 @@ function getDashboardHTML() {
                 const data = await response.json();
 
                 if (data.success) {
-                    statusDiv.innerHTML = \`<div class="alert alert-success">采集完成！共采集 \${data.data.total_collected} 条数据</div>\`;
+                    statusDiv.innerHTML = '<div class="alert alert-success">采集完成！共采集 ' + data.data.total_collected + ' 条数据</div>';
                     loadStats();
                     loadNegativePosts();
                     loadKeywordStats();
                 } else {
-                    statusDiv.innerHTML = \`<div class="alert alert-error">采集失败: \${data.error}</div>\`;
+                    statusDiv.innerHTML = '<div class="alert alert-error">采集失败: ' + data.error + '</div>';
                 }
             } catch (error) {
-                statusDiv.innerHTML = \`<div class="alert alert-error">采集失败: \${error.message}</div>\`;
+                statusDiv.innerHTML = '<div class="alert alert-error">采集失败: ' + error.message + '</div>';
             }
 
             // 3秒后清除状态
@@ -2347,7 +2347,7 @@ function getDashboardHTML() {
         // 显示提示
         function showAlert(message, type = 'info') {
             const alert = document.createElement('div');
-            alert.className = \`alert alert-\${type}\`;
+            alert.className = 'alert alert-' + type;
             alert.textContent = message;
             alert.style.position = 'fixed';
             alert.style.top = '20px';
