@@ -27,9 +27,9 @@ binding = "DB"
 database_name = "xhs-sentiment-db"
 database_id = "742757c7-5e02-4530-92ae-da9a1914531c"  # 已配置
 
-# Cron 触发器 - 每周一上午9点执行
+# Cron 触发器 - 每周一北京时间上午9点执行（UTC时间凌晨1点）
 [triggers]
-crons = ["0 9 * * 1"]
+crons = ["0 1 * * 1"]
 
 # 环境变量
 [vars]
