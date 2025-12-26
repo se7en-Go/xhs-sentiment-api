@@ -74,6 +74,7 @@ class SearchRequest(BaseModel):
     keyword: str
     max_posts: int = 20
     sort_type: str = "general"  # general, time_descending, popularity_descending
+    note_time: int = 2  # 0=不限, 1=一天内, 2=一周内, 3=半年内
 
 class PostData(BaseModel):
     post_id: str
@@ -106,6 +107,7 @@ async def search_posts(request: SearchRequest) -> List[PostData]:
     - keyword: 搜索关键词
     - max_posts: 最大采集数量 (1-50)
     - sort_type: 排序方式 (general, time_descending, popularity_descending)
+    - note_time: 时间范围 (0=不限, 1=一天内, 2=一周内, 3=半年内)
 
     返回:
     - List[PostData]: 采集的笔记列表
@@ -138,7 +140,8 @@ async def search_posts(request: SearchRequest) -> List[PostData]:
             query=request.keyword,
             require_num=request.max_posts,
             cookies_str=cookie,
-            sort_type_choice=sort_type_choice
+            sort_type_choice=sort_type_choice,
+            note_time=request.note_time  # ✅ 添加时间筛选参数
         )
 
         if not success:
