@@ -594,6 +594,137 @@ function isNegativePost(score) {
   return score < CONFIG.NEGATIVE_THRESHOLD;
 }
 
+/**
+ * 计算笔记与关键词的相关性分数（0-1）
+ * @param {string} title - 笔记标题
+ * @param {string} content - 笔记内容
+ * @param {string} keyword - 搜索关键词
+ * @returns {number} 相关性分数 (0-1, 1=完全相关)
+ */
+function calculateRelevanceScore(title, content, keyword) {
+  if (!keyword || !title) {
+    return 0;
+  }
+
+  const combinedText = `${title} ${content || ''}`.toLowerCase();
+  const keywordLower = keyword.toLowerCase();
+
+  // 1. 提取关键词的核心词汇（去掉空格和特殊字符）
+  const coreKeywords = keywordLower
+    .split(/[\s,，、]+/)
+    .filter(k => k.trim().length > 0)
+    .map(k => k.replace(/[^a-z0-9\u4e00-\u9fa5]/g, ''));
+
+  if (coreKeywords.length === 0) {
+    return 0;
+  }
+
+  let score = 0;
+  let maxPossibleScore = 0;
+
+  // 2. 评分权重
+  const weights = {
+    titleExactMatch: 0.5,        // 标题精确匹配（最重要）
+    titlePartialMatch: 0.3,      // 标题部分匹配
+    contentMatch: 0.15,          // 内容匹配
+    brandBonus: 0.05             // 品牌词加成
+  };
+
+  // 3. 检查标题中的精确匹配
+  const titleLower = title.toLowerCase();
+  for (const coreKeyword of coreKeywords) {
+    if (coreKeyword.length < 2) continue; // 跳过单字符
+
+    maxPossibleScore += weights.titleExactMatch + weights.titlePartialMatch + weights.contentMatch;
+
+    // 标题精确匹配（完整包含关键词）
+    if (titleLower.includes(coreKeyword)) {
+      score += weights.titleExactMatch;
+
+      // 完整匹配额外加分
+      if (titleLower === coreKeyword || titleLower.startsWith(coreKeyword + ' ') || titleLower.endsWith(' ' + coreKeyword)) {
+        score += weights.brandBonus;
+      }
+    }
+
+    // 标题部分匹配（包含关键词的一部分，至少3个字符）
+    if (titleLower.length >= 3 && coreKeyword.length >= 3) {
+      const partialMatch = (
+        titleLower.includes(coreKeyword.substring(0, Math.min(6, coreKeyword.length))) ||
+        coreKeyword.includes(titleLower.substring(0, Math.min(6, titleLower.length)))
+      );
+      if (partialMatch && !titleLower.includes(coreKeyword)) {
+        score += weights.titlePartialMatch * 0.5;
+      }
+    }
+
+    // 内容匹配
+    if (combinedText.includes(coreKeyword)) {
+      // 计算关键词在内容中出现的次数
+      const matches = (combinedText.match(new RegExp(coreKeyword, 'g')) || []).length;
+      const contentScore = Math.min(matches * 0.05, weights.contentMatch); // 最多贡献 0.15 分
+      score += contentScore;
+    }
+  }
+
+  // 4. 惩罚机制
+  // 检测竞品关键词（黑名单）
+  const competitorKeywords = [
+    '大卫尼斯', 'off&relax', 'off relax', 'off relax', '欧莱雅', '卡诗', '施华蔻',
+    '海飞丝', '潘婷', '飘柔', '沙宣', '力士', '多芬', '清扬', '舒蕾'
+  ];
+
+  for (const competitor of competitorKeywords) {
+    if (combinedText.includes(competitor.toLowerCase())) {
+      score *= 0.3; // 竞品提及，大幅降权
+      break;
+    }
+  }
+
+  // 如果标题完全不包含任何关键词部分，大幅降权
+  const hasSomeKeywordMatch = coreKeywords.some(k =>
+    titleLower.includes(k.substring(0, Math.min(4, k.length)))
+  );
+
+  if (!hasSomeKeywordMatch && titleLower.length > 0) {
+    score *= 0.2; // 标题完全不相关，大幅降权
+  }
+
+  // 5. 归一化到 0-1 范围
+  return Math.min(Math.max(score / (maxPossibleScore || 1), 0), 1);
+}
+
+/**
+ * 根据相关性分数过滤笔记
+ * @param {Array} posts - 笔记数组
+ * @param {string} keyword - 搜索关键词
+ * @param {number} threshold - 相关性阈值 (默认 0.3)
+ * @returns {Object} { filteredPosts, stats }
+ */
+function filterByRelevance(posts, keyword, threshold = 0.3) {
+  if (!posts || posts.length === 0) {
+    return { filteredPosts: [], stats: { total: 0, filtered: 0, kept: 0, avgScore: 0 } };
+  }
+
+  const scoredPosts = posts.map(post => {
+    const score = calculateRelevanceScore(post.title, post.content, keyword);
+    return { ...post, relevanceScore: score };
+  });
+
+  const filteredPosts = scoredPosts
+    .filter(post => post.relevanceScore >= threshold)
+    .map(({ relevanceScore, ...post }) => post);
+
+  const stats = {
+    total: posts.length,
+    filtered: posts.length - filteredPosts.length,
+    kept: filteredPosts.length,
+    avgScore: scoredPosts.reduce((sum, p) => sum + p.relevanceScore, 0) / posts.length
+  };
+
+  return { filteredPosts, stats };
+}
+
 // ============================================================================
 // 数据库操作函数
 // ============================================================================
@@ -1316,8 +1447,19 @@ async function scrapeXHSData(keyword, maxPosts, env, noteTime = 2) {
 
     log('info', `Processing ${posts.length} posts from Render API for keyword: ${keyword}`);
 
-    // 3. 转换数据格式并进行情感分析
-    const formattedPosts = posts.map(post => {
+    // 3. 先进行相关性过滤，然后再做情感分析
+    const { filteredPosts, stats } = filterByRelevance(posts, keyword, 0.3);
+
+    log('info', `Relevance filtering applied for keyword: ${keyword}`, {
+      original: stats.total,
+      filtered: stats.filtered,
+      kept: stats.kept,
+      avgScore: stats.avgScore.toFixed(3),
+      filterRate: ((stats.filtered / stats.total) * 100).toFixed(1) + '%'
+    });
+
+    // 4. 转换数据格式并进行情感分析
+    const formattedPosts = filteredPosts.map(post => {
       // 合并标题和内容进行情感分析
       const combinedText = `${post.title} ${post.content || ''}`;
 
@@ -1339,7 +1481,7 @@ async function scrapeXHSData(keyword, maxPosts, env, noteTime = 2) {
       };
     });
 
-    log('info', `Successfully scraped ${formattedPosts.length} posts for keyword: ${keyword} with sentiment analysis`);
+    log('info', `Successfully scraped ${formattedPosts.length} posts for keyword: ${keyword} with relevance filtering and sentiment analysis`);
     return formattedPosts;
 
   } catch (error) {
